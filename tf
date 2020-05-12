@@ -2,6 +2,21 @@
 set -e
 set -o pipefail
 
+TMP_DIR="./.tmp"
+CONFIG_DIR=""
+
+log() {
+    local args="$*"
+    local prefix="\e[32m[tf]:\e[0m"
+    echo -e "$prefix $args"
+}
+
+log_warning() {
+    local args="$*"
+    local prefix="\e[33m[tf]:\e[0m"
+    echo -e "$prefix $args" >&2
+}
+
 # help function
 function _tf_help () {
   cat <<-EOF
@@ -76,7 +91,7 @@ function _tf_help () {
 
 function _tf_generic () {
   (
-    cd "${TMP_DIR}/configurations/${CONFIGURATION}"
+    cd "${CONFIG_DIR}"
     terraform "$@"
   )
 }
@@ -90,12 +105,12 @@ function _tf_bootstrap () {
 			# you can use gopass to retrieve them. For example:
 			export AWS_ACCESS_KEY_ID=$(gopass keystore/caascad/aws/181151069204/AWS_ACCESS_KEY_ID)
 			export AWS_SECRET_ACCESS_KEY=$(gopass keystore/caascad/aws/181151069204/AWS_SECRET_ACCESS_KEY)
-			
+
 			# creds for FLEXIBLE ENGINE provider
 			# Those creds are often available in the caascad keystore
 			# export TF_VAR_fe_access_key=$(gopass caascad/fe/OCB1111111/FE_ACCESS_KEY)
 			# export TF_VAR_fe_secret_key=$(gopass caascad/fe/OCB1111111/FE_SECRET_KEY)
-			
+
 			# provide FLEXIBLE ENGINE project and domain
 			# export TF_VAR_fe_domain=XXXX
 			# export TF_VAR_fe_tenant=YYYY
@@ -121,7 +136,6 @@ function _tf_bootstrap () {
     _tf_clone
 
     # get envrc.EXAMPLE, tfvars file and documentation
-    CONFIG_DIR="${TMP_DIR}/configurations/${CONFIGURATION}"
     LIST_FILE="$(find "${CONFIG_DIR}" -name '*EXAMPLE' -o -name 'shell.nix' -o -name 'toolbox.json' -o -name '*.tfvars*' -o -iname 'readme*' -o -name '*.md')"
     for f in ${LIST_FILE}; do
       if [[ ! -f $(basename "${f}") ]]; then
@@ -148,7 +162,7 @@ function _tf_bootstrap () {
 }
 
 function _tf_clone () {
-  if ! [[ -d "${TMP_DIR}/configurations/${CONFIGURATION}" ]]; then
+  if ! [[ -d "${CONFIG_DIR}" ]]; then
     _tf_clean
     # clone lib.git repository
     git clone "${LIB_URL}" "${TMP_DIR}"
@@ -160,15 +174,29 @@ function _tf_clone () {
   )
 }
 
+function _tf_update_shell() {
+  if ! diff toolbox.json "${CONFIG_DIR}/toolbox.json" >/dev/null || \
+     ! diff shell.nix "${CONFIG_DIR}/shell.nix" >/dev/null; then
+    cp "${CONFIG_DIR}/shell.nix" .
+    cp "${CONFIG_DIR}/toolbox.json" .
+    log "Nix shell was updated in the configuration and updated in the current directory."
+    log "Run tf again to use the new shell!"
+    exit 0
+  fi
+}
+
 function _tf_init () {
   # clone the lib repository
   _tf_clone
 
-  # add any json, tf and tfvars files present here to override the downloaded configuration
-  cp ./*.{tf,tfvars,json} "${TMP_DIR}/configurations/${CONFIGURATION}" &>/dev/null || true
+  # make sure we have an up-to-date shell in the current dir
+  _tf_update_shell
+
+  # add any tf and tfvars files present here to override the downloaded configuration
+  cp ./*.{tf,tfvars} "${CONFIG_DIR}" &>/dev/null || true
 
   # environment replacement in every *tf* files
-  sed -i "s/#ENVIRONMENT#/${ENVIRONMENT}/g" "${TMP_DIR}"/configurations/"${CONFIGURATION}"/*.tf*
+  sed -i "s/#ENVIRONMENT#/${ENVIRONMENT}/g" "${CONFIG_DIR}"/*.tf*
 
   # terraform init
   _tf_generic init -upgrade=true
@@ -202,7 +230,6 @@ function _tf_parsing () {
   ACTION=$1;
   ENV=$(basename "$(git remote get-url origin 2>/dev/null)")
   ENVIRONMENT="${ENVIRONMENT:-${ENV%.*}}"
-  TMP_DIR="./.tmp"
   DEBUG="${DEBUG:-0}"
 
   case "${ACTION}" in
@@ -251,26 +278,28 @@ function _tf_parsing () {
   case "${ACTION}" in
     init | plan | apply | destroy | bootstrap)
       if [[ -z "${CONFIGURATION}" ]]; then
-        echo "Missing configuration option"
+        log_warning "Missing configuration option"
         _tf_help
         exit 1
       fi
       ;;& # execution flow continues, next pattern is checked
     init | plan | apply | bootstrap)
       if [[ -z "${ENVIRONMENT}" ]]; then
-        echo "Missing environment option"
+        log_warning "Missing environment option"
         _tf_help
         exit 1
       fi
       ;;& # execution flow continues, next pattern is checked
     bootstrap)
       if [[ -z "${GIT_REVISION}" ]]; then
-        echo "Missing git revision option"
+        log_warning "Missing git revision option"
         _tf_help
         exit 1
       fi
       ;;
   esac
+
+  CONFIG_DIR="${TMP_DIR}/configurations/${CONFIGURATION}"
 }
 
 _tf_parsing "$@"
