@@ -120,9 +120,9 @@ function _tf_bootstrap () {
     # get the git repository
     _tf_clone
 
-    # get envrc.EXAMPLE and tfvars file
+    # get envrc.EXAMPLE, tfvars file and documentation
     CONFIG_DIR="${TMP_DIR}/configurations/${CONFIGURATION}"
-    LIST_FILE="$(find "${CONFIG_DIR}" -name '*EXAMPLE' -o -name 'shell.nix' -o -name 'toolbox.json' -o -name '*.tfvars*')"
+    LIST_FILE="$(find "${CONFIG_DIR}" -name '*EXAMPLE' -o -name 'shell.nix' -o -name 'toolbox.json' -o -name '*.tfvars*' -o -iname 'readme*' -o -name '*.md')"
     for f in ${LIST_FILE}; do
       if [[ ! -f $(basename "${f}") ]]; then
         cp "${f}" .
