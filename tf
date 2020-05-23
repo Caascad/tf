@@ -175,10 +175,10 @@ function _tf_clone () {
 }
 
 function _tf_update_shell() {
-  if ! diff toolbox.json "${CONFIG_DIR}/toolbox.json" >/dev/null || \
-     ! diff shell.nix "${CONFIG_DIR}/shell.nix" >/dev/null; then
-    cp "${CONFIG_DIR}/shell.nix" .
-    cp "${CONFIG_DIR}/toolbox.json" .
+  if ! diff toolbox.json "${CONFIG_DIR}/toolbox.json" &>/dev/null || \
+     ! diff shell.nix "${CONFIG_DIR}/shell.nix" &>/dev/null; then
+    cp "${CONFIG_DIR}/shell.nix" . &>/dev/null || log_warning "shell.nix is missing in configuration."
+    cp "${CONFIG_DIR}/toolbox.json" . &>/dev/null || log_warning "toolbox.json is missing in configuration."
     log "Nix shell was updated in the configuration and updated in the current directory."
     log "Run tf again to use the new shell!"
     exit 0
@@ -193,7 +193,7 @@ function _tf_init () {
   _tf_update_shell
 
   # add any tf and tfvars files present here to override the downloaded configuration
-  cp ./*.{tf,tfvars} "${CONFIG_DIR}" &>/dev/null || true
+  cp ./*.{tf,tfvars,tfvars.json} "${CONFIG_DIR}" &>/dev/null || true
 
   # environment replacement in every *tf* files
   sed -i "s/#ENVIRONMENT#/${ENVIRONMENT}/g" "${CONFIG_DIR}"/*.tf*
