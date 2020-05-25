@@ -69,8 +69,10 @@ function _tf_help () {
 		            default: refs/heads/master
 
 		      -l | --lib-url LIB_URL
-		            Git modules repository url
+		            Git repository url
 		            Can be set with LIB_URL environment variable
+		            Can be set to a local PATH for development purpose.
+		            e.g. ~/git/caascad/terraform/lib
 
 		            default: git@git.corp.cloudwatt.com:pocwatt/terraform/lib.git
 
@@ -133,7 +135,7 @@ function _tf_bootstrap () {
     cd "${CONFIGURATION}"
 
     # get the git repository
-    _tf_clone
+    _tf_fetch
 
     # get envrc.EXAMPLE, tfvars file and documentation
     LIST_FILE="$(find "${CONFIG_DIR}" -name '*EXAMPLE' -o -name 'shell.nix' -o -name 'toolbox.json' -o -name '*.tfvars*' -o -iname 'readme*' -o -name '*.md')"
@@ -156,22 +158,27 @@ function _tf_bootstrap () {
 			GIT_REVISION=${GIT_REVISION}
 			# DEBUG=${DEBUG}
 			# LIB_URL=${LIB_URL}
+			# LIB_URL=~/git/caascad/terraform
 			ENVIRONMENT=${ENVIRONMENT}
 		EOF
   )
 }
 
-function _tf_clone () {
-  if ! [[ -d "${CONFIG_DIR}" ]]; then
-    _tf_clean
-    # clone lib.git repository
-    git clone "${LIB_URL}" "${TMP_DIR}"
+function _tf_fetch () {
+  _tf_clean
+  mkdir -p ${TMP_DIR}
+  if _is_git_url "${LIB_URL}"; then 
+    # fetch lib.git repository
+    (
+      cd ${TMP_DIR}
+      git init
+      git remote add origin "${LIB_URL}"
+      git fetch origin "${GIT_REVISION}"
+      git reset --hard FETCH_HEAD
+    )
+  else
+    cp -R "${LIB_URL}"/* "${TMP_DIR}"
   fi
-  (
-    cd "${TMP_DIR}"
-    git fetch origin
-    git reset --hard "${GIT_REVISION}"
-  )
 }
 
 function _tf_update_shell() {
@@ -186,8 +193,9 @@ function _tf_update_shell() {
 }
 
 function _tf_init () {
-  # clone the lib repository
-  _tf_clone
+
+  # fetch the lib repository
+  _tf_fetch
 
   # make sure we have an up-to-date shell in the current dir
   _tf_update_shell
@@ -218,6 +226,11 @@ function _tf_debug () {
 		TERRAFORM_OPTIONS: ${TERRAFORM_OPTIONS}
 	EOF
   terraform -v >&2
+}
+
+function _is_git_url () {
+  git_url_regex='^(git|ssh|https?|git@[[:alnum:].-]+):(//)?(.*?)\.git/?$'
+  [[ "$1" =~ $git_url_regex ]]
 }
 
 function _tf_parsing () {
