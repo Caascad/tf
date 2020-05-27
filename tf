@@ -5,7 +5,7 @@ set -o pipefail
 TF_TMPDIR="./.tmp"
 TF_CONFIG_DIR=""
 TF_DEBUG="${TF_DEBUG:-0}"
-TERRAFORM_ARGS=""
+TF_ARGS=()
 
 log() {
     local args="$*"
@@ -42,7 +42,7 @@ NAME
 SYNOPSIS
       tf bootstrap [ -c CONFIGURATION ] [ -r GIT_REVISION ] [ -e ENVIRONMENT ]
       tf clean
-      tf <terraform-action> [TERRAFORM_ARGS...]
+      tf <terraform-action> [ARGS...]
 
 DESCRIPTION
       bootstrap
@@ -206,18 +206,19 @@ function _tf_parsing () {
   ENV=$(basename "$(git remote get-url origin 2>/dev/null)")
   ENVIRONMENT="${ENVIRONMENT:-${ENV%.*}}"
   LIB_URL="${LIB_URL:-git@git.corp.cloudwatt.com:pocwatt/terraform/lib.git}"
-  log "Lib: ${LIB_URL}"
   if _is_git_url "${LIB_URL}"; then
     GIT_REVISION="${GIT_REVISION:-refs/heads/master}"
-    log "Revision: ${GIT_REVISION}"
   fi
-  ACTION=$1;
-  shift
-  log "Action: ${ACTION}"
+
+  [[ $# -eq 0 ]] && _tf_help && exit 0
 
   # parameters parsing
   while [[ $# -gt 0 ]]; do
     case "$1" in
+      help | -h | --help)
+        _tf_help
+        exit 0
+        ;;
       -c | --configuration)
         shift
         CONFIGURATION=$1
@@ -235,7 +236,7 @@ function _tf_parsing () {
         ENVIRONMENT=$1
         ;;
       *)
-        TERRAFORM_ARGS="$TERRAFORM_ARGS $1"
+        TF_ARGS+=("$1")
         shift
         ;;
     esac
@@ -253,10 +254,15 @@ function _tf_parsing () {
     exit 1
   fi
 
-  log_debug "Args:$TERRAFORM_ARGS"
-  log "Environment: ${ENVIRONMENT}"
-  log "Config: ${CONFIGURATION}"
+  ACTION=${TF_ARGS[0]}
+  TF_ARGS=("${TF_ARGS[@]:1}")
 
+  log "Environment: ${ENVIRONMENT}"
+  log "Lib: ${LIB_URL}"
+  log "Revision: ${GIT_REVISION}"
+  log "Action: ${ACTION}"
+  log "Args: ${TF_ARGS[*]}"
+  log "Config: ${CONFIGURATION}"
   TF_CONFIG_DIR="${TF_TMPDIR}/configurations/${CONFIGURATION}"
   log_debug "Config dir: ${TF_CONFIG_DIR}"
 
@@ -274,6 +280,6 @@ case "${ACTION}" in
   *)
     _tf_init
     # shellcheck disable=2086
-    _tf_generic "${ACTION}" ${TERRAFORM_ARGS}
+    _tf_generic "${ACTION}" "${TF_ARGS[@]}"
     ;;
 esac
