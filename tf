@@ -167,7 +167,7 @@ function _tf_bootstrap () {
 function _tf_fetch () {
   _tf_clean
   mkdir -p ${TMP_DIR}
-  if _is_git_url "${LIB_URL}"; then 
+  if ! _is_local "${LIB_URL}"; then
     # fetch lib.git repository
     (
       cd ${TMP_DIR}
@@ -228,9 +228,8 @@ function _tf_debug () {
   terraform -v >&2
 }
 
-function _is_git_url () {
-  git_url_regex='^(git|ssh|https?|git@[[:alnum:].-]+):(//)?(.*?)\.git/?$'
-  [[ "$1" =~ $git_url_regex ]]
+function _is_local () {
+  [[ -d "$1" ]]
 }
 
 function _tf_parsing () {
