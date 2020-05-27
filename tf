@@ -5,6 +5,7 @@ set -o pipefail
 TF_TMPDIR="./.tmp"
 TF_CONFIG_DIR=""
 TF_DEBUG="${TF_DEBUG:-0}"
+TERRAFORM_ARGS=""
 
 log() {
     local args="$*"
@@ -34,83 +35,66 @@ log_error() {
 
 # help function
 function _tf_help () {
-  cat <<-EOF
-		NAME
-		      Thin wrapper around terraform to work with Caascad configurations
+  cat <<EOF
+NAME
+      Thin wrapper around Terraform to work with Caascad configurations
 
-		SYNOPSIS
-		      tf bootstrap [ -c CONFIGURATION ] [ -r GIT_REVISION ] [ -e ENVIRONMENT ]
-		      tf init [-c CONFIGURATION] [-r GIT_REVISION] [-l LIB_URL] [-e ENVIRONMENT]
-		      tf plan [-c CONFIGURATION] [-r GIT_REVISION] [-- TERRAFORM_OPTIONS ]
-		      tf apply [-c CONFIGURATION] [-r GIT_REVISION] [-- TERRAFORM_OPTIONS ]
-		      tf show [-c CONFIGURATION] [-- TERRAFORM_OPTIONS ]
-		      tf destroy [-c CONFIGURATION] [-- TERRAFORM_OPTIONS ]
-		      tf clean
+SYNOPSIS
+      tf bootstrap [ -c CONFIGURATION ] [ -r GIT_REVISION ] [ -e ENVIRONMENT ]
+      tf clean
+      tf <terraform-action> [TERRAFORM_ARGS...]
 
-		DESCRIPTION
-		      bootstrap
-		           helper provided to create a configuration directory within an environment directory.
-		           It will create the directory with, tffile, terraform.tfvars, and .envrc in it.
-		           This helper should be executed in an empty directory.
+DESCRIPTION
+      bootstrap
+            Helper provided to create a configuration directory within an environment directory.
+            It will create the directory with, tffile, terraform.tfvars, and .envrc in it.
+            This helper should be executed in an empty directory.
 
-		      init
-		           init the specified configuration in .tmp and setup the backend
-		           according to the current ENVIRONMENT
+      clean
+            Clean temporary config directory
 
-		      plan
-		           generates a terraform plan for the specified configuration
+      <terraform-action>
+            Standard terraform actions, init apply, destroy, etc...
 
-		      apply
-		           creates resources planified with plan command
+      -c | --configuration CONFIGURATION
+            The name of the configuration to apply. It must be within the
+            configuration directory in lib.git
+            Can be set with CONFIGURATION environment variable
 
-		      show
-		           issue the terraform show command for the specified configuration
+      -r | --revision GIT_REVISION
+            The git revision to extract from lib.git
+            Can be set with GIT_REVISION environment variable
 
-		      destroy
-		           issue the terraform destroy command for the specified configuration
+            default: refs/heads/master
 
-		      clean
-		           clean .terraform and .tmp folder
+      -l | --lib-url LIB_URL
+            Git repository url
+            Can be set with LIB_URL environment variable
+            Can be set to a local PATH for development purpose.
+            e.g. ~/git/caascad/terraform/lib
 
-		      -c | --configuration CONFIGURATION
-		            The name of the configuration to apply. It must be within the
-		            configuration directory in lib.git
-		            Can be set with CONFIGURATION environment variable
+            default: git@git.corp.cloudwatt.com:pocwatt/terraform/lib.git
 
-		      -r | --revision GIT_REVISION
-		            The git revision to extract from lib.git
-		            Can be set with GIT_REVISION environment variable
+      -e | --environment ENVIRONMENT
+            The environment (i.e DNS domain) we are targetting
+            Can be set with ENVIRONMENT environment variable
 
-		            default: refs/heads/master
+            default: current git repo name
 
-		      -l | --lib-url LIB_URL
-		            Git repository url
-		            Can be set with LIB_URL environment variable
-		            Can be set to a local PATH for development purpose.
-		            e.g. ~/git/caascad/terraform/lib
+EXAMPLES
 
-		            default: git@git.corp.cloudwatt.com:pocwatt/terraform/lib.git
+      $ tf apply -c base -r refs/head/master \\
+          -m git@git.corp.cloudwatt.com:pocwatt/terraform/mylib.git -e client1
 
-		      -e | --environment ENVIRONMENT
-		            The environment (i.e DNS domain) we are targetting
-		            Can be set with ENVIRONMENT environment variable
-
-		            default: current git repo name
-
-		EXAMPLES
-
-		      $ tf apply -c base -r refs/head/master \\
-		          -m git@git.corp.cloudwatt.com:pocwatt/terraform/mylib.git -e client1
-
-		      $ CONFIGURATION=base tf init
-	EOF
+      $ CONFIGURATION=base tf init
+EOF
 }
 
 function _tf_generic () {
   (
     cd "${TF_CONFIG_DIR}"
     [ ! -f shell.nix ] && log_error "No shell.nix is present in '${TF_CONFIG_DIR}'. Aborting."
-    terraform_bin=$(nix-shell --run "type -p terraform" || log_error "No terraform binary is defined in the shell. Aborting.")
+    terraform_bin=$(nix-shell --pure --run "type -p terraform" || log_error "No terraform binary is defined in the shell. Aborting.")
     log_debug "Running ${terraform_bin} $*"
     "$terraform_bin" "$@"
   )
@@ -125,15 +109,6 @@ function _tf_bootstrap () {
 			# you can use gopass to retrieve them. For example:
 			export AWS_ACCESS_KEY_ID=$(gopass keystore/caascad/aws/181151069204/AWS_ACCESS_KEY_ID)
 			export AWS_SECRET_ACCESS_KEY=$(gopass keystore/caascad/aws/181151069204/AWS_SECRET_ACCESS_KEY)
-
-			# creds for FLEXIBLE ENGINE provider
-			# Those creds are often available in the caascad keystore
-			# export TF_VAR_fe_access_key=$(gopass caascad/fe/OCB1111111/FE_ACCESS_KEY)
-			# export TF_VAR_fe_secret_key=$(gopass caascad/fe/OCB1111111/FE_SECRET_KEY)
-
-			# provide FLEXIBLE ENGINE project and domain
-			# export TF_VAR_fe_domain=XXXX
-			# export TF_VAR_fe_tenant=YYYY
 		EOF
   fi
 
@@ -230,26 +205,18 @@ function _tf_parsing () {
   # some default variables
   ENV=$(basename "$(git remote get-url origin 2>/dev/null)")
   ENVIRONMENT="${ENVIRONMENT:-${ENV%.*}}"
-  log "Environment: ${ENVIRONMENT}"
-  ACTION=$1;
-  log "Action: ${ACTION}"
   LIB_URL="${LIB_URL:-git@git.corp.cloudwatt.com:pocwatt/terraform/lib.git}"
   log "Lib: ${LIB_URL}"
-  GIT_REVISION="${GIT_REVISION:-refs/heads/master}"
-  log "Revision: ${GIT_REVISION}"
-
-  case "${ACTION}" in
-    apply | plan | init | clean | show | destroy | bootstrap)
-      ;;
-    *)
-      _tf_help
-      exit 1
-      ;;
-  esac
-
+  if _is_git_url "${LIB_URL}"; then
+    GIT_REVISION="${GIT_REVISION:-refs/heads/master}"
+    log "Revision: ${GIT_REVISION}"
+  fi
+  ACTION=$1;
   shift
+  log "Action: ${ACTION}"
+
   # parameters parsing
-  while [[ $# -gt 1 ]]; do
+  while [[ $# -gt 0 ]]; do
     case "$1" in
       -c | --configuration)
         shift
@@ -267,64 +234,50 @@ function _tf_parsing () {
         shift
         ENVIRONMENT=$1
         ;;
-      --)
-        shift
-        TERRAFORM_OPTIONS="$*"
-        break
-        ;;
       *)
-        _tf_help
-        exit 1
+        TERRAFORM_ARGS="$TERRAFORM_ARGS $1"
+        shift
         ;;
     esac
-    shift
   done
 
-  # mandatory parameters check
-  case "${ACTION}" in
-    init | plan | apply | destroy | bootstrap)
-      if [[ -z "${CONFIGURATION}" ]]; then
-        log_warning "Missing configuration option"
-        _tf_help
-        exit 1
-      fi
-      ;;& # execution flow continues, next pattern is checked
-    init | plan | apply | bootstrap)
-      if [[ -z "${ENVIRONMENT}" ]]; then
-        log_warning "Missing environment option"
-        _tf_help
-        exit 1
-      fi
-      ;;& # execution flow continues, next pattern is checked
-    bootstrap)
-      if [[ -z "${GIT_REVISION}" ]]; then
-        log_warning "Missing git revision option"
-        _tf_help
-        exit 1
-      fi
-      ;;
-  esac
+  if [[ -z "${CONFIGURATION}" ]]; then
+    log_warning "Missing configuration option"
+    _tf_help
+    exit 1
+  fi
 
-  TF_CONFIG_DIR="${TF_TMPDIR}/configurations/${CONFIGURATION}"
+  if [[ -z "${ENVIRONMENT}" ]]; then
+    log_warning "Missing environment option"
+    _tf_help
+    exit 1
+  fi
+
+  log_debug "Args:$TERRAFORM_ARGS"
+  log "Environment: ${ENVIRONMENT}"
   log "Config: ${CONFIGURATION}"
+
+  TF_CONFIG_DIR=$(realpath "${TF_TMPDIR}/configurations/${CONFIGURATION}")
   log_debug "Config dir: ${TF_CONFIG_DIR}"
+
 }
 
 _tf_parsing "$@"
 
 case "${ACTION}" in
-  clean | init | bootstrap)
+  clean | bootstrap)
     "_tf_${ACTION}"
+    ;;
+  init)
+    _tf_init
     ;;
   apply | plan)
     _tf_init
-    ;& # bash 4 - the execution flow continues, the next pattern is not checked and the block is executed
-  show | destroy)
-    # shellcheck disable=2086
-    _tf_generic "${ACTION}" ${TERRAFORM_OPTIONS}
-    ;;
+    # bash 4 - the execution flow continues
+    # the next pattern is not checked and the block is executed
+    ;&
   *)
-    _tf_help
-    exit 1
+    # shellcheck disable=2086
+    _tf_generic "${ACTION}" ${TERRAFORM_ARGS}
     ;;
 esac
