@@ -2,8 +2,8 @@
 set -e
 set -o pipefail
 
-TMP_DIR="./.tmp"
-CONFIG_DIR=""
+TF_TMPDIR="./.tmp"
+TF_CONFIG_DIR=""
 TF_DEBUG="${TF_DEBUG:-0}"
 
 log() {
@@ -108,8 +108,8 @@ function _tf_help () {
 
 function _tf_generic () {
   (
-    cd "${CONFIG_DIR}"
-    [ ! -f shell.nix ] && log_error "No shell.nix is present in '${CONFIG_DIR}'. Aborting."
+    cd "${TF_CONFIG_DIR}"
+    [ ! -f shell.nix ] && log_error "No shell.nix is present in '${TF_CONFIG_DIR}'. Aborting."
     terraform_bin=$(nix-shell --run "type -p terraform" || log_error "No terraform binary is defined in the shell. Aborting.")
     log_debug "Running ${terraform_bin} $*"
     "$terraform_bin" "$@"
@@ -156,15 +156,15 @@ function _tf_bootstrap () {
     _tf_fetch
 
     # get envrc.EXAMPLE, tfvars file and documentation
-    LIST_FILE="$(find "${CONFIG_DIR}" -name '*EXAMPLE' -o -name '*.tfvars*' -o -iname 'readme*' -o -name '*.md')"
+    LIST_FILE="$(find "${TF_CONFIG_DIR}" -name '*EXAMPLE' -o -name '*.tfvars*' -o -iname 'readme*' -o -name '*.md')"
     for f in ${LIST_FILE}; do
       if [[ ! -f $(basename "${f}") ]]; then
         cp "${f}" .
       fi
     done
 
-    if [[ -f "${CONFIG_DIR}/envrc.EXAMPLE" ]] && [[ ! -f ".envrc" ]]; then
-      cp "${CONFIG_DIR}/envrc.EXAMPLE" .envrc || true
+    if [[ -f "${TF_CONFIG_DIR}/envrc.EXAMPLE" ]] && [[ ! -f ".envrc" ]]; then
+      cp "${TF_CONFIG_DIR}/envrc.EXAMPLE" .envrc || true
     fi
 
     # substitute #ENVIRONMENT in terraform.tfvars and .envrc
@@ -184,12 +184,12 @@ function _tf_bootstrap () {
 
 function _tf_fetch () {
   _tf_clean
-  mkdir -p ${TMP_DIR}
+  mkdir -p ${TF_TMPDIR}
   if ! _is_local "${LIB_URL}"; then
     log_debug "Fetching configuration from ${LIB_URL} at revision ${GIT_REVISION}"
     # fetch lib.git repository
     (
-      cd ${TMP_DIR}
+      cd ${TF_TMPDIR}
       git init
       git remote add origin "${LIB_URL}"
       git fetch origin "${GIT_REVISION}"
@@ -197,7 +197,7 @@ function _tf_fetch () {
     )
   else
     log_debug "Copying configuration from ${LIB_URL}"
-    cp -R "${LIB_URL}"/* "${TMP_DIR}"
+    cp -R "${LIB_URL}"/* "${TF_TMPDIR}"
   fi
 }
 
@@ -206,17 +206,17 @@ function _tf_init () {
   _tf_fetch
 
   # add any tf and tfvars files present here to override the downloaded configuration
-  cp ./*.{tf,tfvars,tfvars.json} "${CONFIG_DIR}" &>/dev/null || true
+  cp ./*.{tf,tfvars,tfvars.json} "${TF_CONFIG_DIR}" &>/dev/null || true
 
   # environment replacement in every *tf* files
-  sed -i "s/#ENVIRONMENT#/${ENVIRONMENT}/g" "${CONFIG_DIR}"/*.tf*
+  sed -i "s/#ENVIRONMENT#/${ENVIRONMENT}/g" "${TF_CONFIG_DIR}"/*.tf*
 
   # terraform init
   _tf_generic init -upgrade=true
 }
 
 function _tf_clean () {
-  rm -rf "${TMP_DIR}" &>/dev/null || true
+  rm -rf "${TF_TMPDIR}" &>/dev/null || true
 }
 
 function _is_local () {
@@ -305,9 +305,9 @@ function _tf_parsing () {
       ;;
   esac
 
-  CONFIG_DIR="${TMP_DIR}/configurations/${CONFIGURATION}"
+  TF_CONFIG_DIR="${TF_TMPDIR}/configurations/${CONFIGURATION}"
   log "Config: ${CONFIGURATION}"
-  log_debug "Config dir: ${CONFIG_DIR}"
+  log_debug "Config dir: ${TF_CONFIG_DIR}"
 }
 
 _tf_parsing "$@"
