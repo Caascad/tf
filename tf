@@ -277,6 +277,10 @@ case "${ACTION}" in
   init)
     _tf_init
     ;;
+  state|output)
+    [ ! -d "${TF_CONFIG_DIR}" ] && _tf_init
+    _tf_generic "${ACTION}" "${TF_ARGS[@]}"
+    ;;
   *)
     _tf_init
     # shellcheck disable=2086
