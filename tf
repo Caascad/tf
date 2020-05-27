@@ -4,6 +4,7 @@ set -o pipefail
 
 TMP_DIR="./.tmp"
 CONFIG_DIR=""
+TF_DEBUG="${TF_DEBUG:-0}"
 
 log() {
     local args="$*"
@@ -11,10 +12,24 @@ log() {
     echo -e "$prefix $args"
 }
 
+log_debug() {
+    [[ ${TF_DEBUG} -eq 0 ]] && return
+    local args="$*"
+    local prefix="\e[36m[tf]:\e[0m"
+    echo -e "$prefix $args" >&2
+}
+
 log_warning() {
     local args="$*"
     local prefix="\e[33m[tf]:\e[0m"
     echo -e "$prefix $args" >&2
+}
+
+log_error() {
+    local args="$*"
+    local prefix="\e[31m[tf]:\e[0m"
+    echo -e "$prefix $args" >&2
+    exit 1
 }
 
 # help function
@@ -94,7 +109,10 @@ function _tf_help () {
 function _tf_generic () {
   (
     cd "${CONFIG_DIR}"
-    terraform "$@"
+    [ ! -f shell.nix ] && log_error "No shell.nix is present in '${CONFIG_DIR}'. Aborting."
+    terraform_bin=$(nix-shell --run "type -p terraform" || log_error "No terraform binary is defined in the shell. Aborting.")
+    log_debug "Running ${terraform_bin} $*"
+    "$terraform_bin" "$@"
   )
 }
 
@@ -138,7 +156,7 @@ function _tf_bootstrap () {
     _tf_fetch
 
     # get envrc.EXAMPLE, tfvars file and documentation
-    LIST_FILE="$(find "${CONFIG_DIR}" -name '*EXAMPLE' -o -name 'shell.nix' -o -name 'toolbox.json' -o -name '*.tfvars*' -o -iname 'readme*' -o -name '*.md')"
+    LIST_FILE="$(find "${CONFIG_DIR}" -name '*EXAMPLE' -o -name '*.tfvars*' -o -iname 'readme*' -o -name '*.md')"
     for f in ${LIST_FILE}; do
       if [[ ! -f $(basename "${f}") ]]; then
         cp "${f}" .
@@ -156,7 +174,7 @@ function _tf_bootstrap () {
     cat <<-EOF >"./tffile"
 			CONFIGURATION=${CONFIGURATION}
 			GIT_REVISION=${GIT_REVISION}
-			# DEBUG=${DEBUG}
+			# TF_DEBUG=${TF_DEBUG}
 			# LIB_URL=${LIB_URL}
 			# LIB_URL=~/git/caascad/terraform
 			ENVIRONMENT=${ENVIRONMENT}
@@ -168,6 +186,7 @@ function _tf_fetch () {
   _tf_clean
   mkdir -p ${TMP_DIR}
   if ! _is_local "${LIB_URL}"; then
+    log_debug "Fetching configuration from ${LIB_URL} at revision ${GIT_REVISION}"
     # fetch lib.git repository
     (
       cd ${TMP_DIR}
@@ -177,28 +196,14 @@ function _tf_fetch () {
       git reset --hard FETCH_HEAD
     )
   else
+    log_debug "Copying configuration from ${LIB_URL}"
     cp -R "${LIB_URL}"/* "${TMP_DIR}"
   fi
 }
 
-function _tf_update_shell() {
-  if ! diff toolbox.json "${CONFIG_DIR}/toolbox.json" &>/dev/null || \
-     ! diff shell.nix "${CONFIG_DIR}/shell.nix" &>/dev/null; then
-    cp "${CONFIG_DIR}/shell.nix" . &>/dev/null || log_warning "shell.nix is missing in configuration."
-    cp "${CONFIG_DIR}/toolbox.json" . &>/dev/null || log_warning "toolbox.json is missing in configuration."
-    log "Nix shell was updated in the configuration and updated in the current directory."
-    log "Run tf again to use the new shell!"
-    exit 0
-  fi
-}
-
 function _tf_init () {
-
   # fetch the lib repository
   _tf_fetch
-
-  # make sure we have an up-to-date shell in the current dir
-  _tf_update_shell
 
   # add any tf and tfvars files present here to override the downloaded configuration
   cp ./*.{tf,tfvars,tfvars.json} "${CONFIG_DIR}" &>/dev/null || true
@@ -214,20 +219,6 @@ function _tf_clean () {
   rm -rf "${TMP_DIR}" &>/dev/null || true
 }
 
-function _tf_debug () {
-  # let's display every parameter
-  cat <<-EOF >&2
-		ACTION: ${ACTION}
-		CONFIGURATION: ${CONFIGURATION}
-		GIT_REVISION: ${GIT_REVISION}
-		LIB_URL: ${LIB_URL}
-		ENVIRONMENT: ${ENVIRONMENT}
-		TMP_DIR: ${TMP_DIR}
-		TERRAFORM_OPTIONS: ${TERRAFORM_OPTIONS}
-	EOF
-  terraform -v >&2
-}
-
 function _is_local () {
   [[ -d "$1" ]]
 }
@@ -237,12 +228,15 @@ function _tf_parsing () {
   # shellcheck disable=1091
   source "tffile" &>/dev/null || true
   # some default variables
-  GIT_REVISION="${GIT_REVISION:-refs/heads/master}"
-  LIB_URL="${LIB_URL:-git@git.corp.cloudwatt.com:pocwatt/terraform/lib.git}"
-  ACTION=$1;
   ENV=$(basename "$(git remote get-url origin 2>/dev/null)")
   ENVIRONMENT="${ENVIRONMENT:-${ENV%.*}}"
-  DEBUG="${DEBUG:-0}"
+  log "Environment: ${ENVIRONMENT}"
+  ACTION=$1;
+  log "Action: ${ACTION}"
+  LIB_URL="${LIB_URL:-git@git.corp.cloudwatt.com:pocwatt/terraform/lib.git}"
+  log "Lib: ${LIB_URL}"
+  GIT_REVISION="${GIT_REVISION:-refs/heads/master}"
+  log "Revision: ${GIT_REVISION}"
 
   case "${ACTION}" in
     apply | plan | init | clean | show | destroy | bootstrap)
@@ -312,13 +306,11 @@ function _tf_parsing () {
   esac
 
   CONFIG_DIR="${TMP_DIR}/configurations/${CONFIGURATION}"
+  log "Config: ${CONFIGURATION}"
+  log_debug "Config dir: ${CONFIG_DIR}"
 }
 
 _tf_parsing "$@"
-
-if [[ ${DEBUG} -gt 0 ]]; then
-  _tf_debug
-fi
 
 case "${ACTION}" in
   clean | init | bootstrap)
