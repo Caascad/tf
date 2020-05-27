@@ -257,7 +257,7 @@ function _tf_parsing () {
   log "Environment: ${ENVIRONMENT}"
   log "Config: ${CONFIGURATION}"
 
-  TF_CONFIG_DIR=$(realpath "${TF_TMPDIR}/configurations/${CONFIGURATION}")
+  TF_CONFIG_DIR="${TF_TMPDIR}/configurations/${CONFIGURATION}"
   log_debug "Config dir: ${TF_CONFIG_DIR}"
 
 }
@@ -271,12 +271,8 @@ case "${ACTION}" in
   init)
     _tf_init
     ;;
-  apply | plan)
-    _tf_init
-    # bash 4 - the execution flow continues
-    # the next pattern is not checked and the block is executed
-    ;&
   *)
+    _tf_init
     # shellcheck disable=2086
     _tf_generic "${ACTION}" ${TERRAFORM_ARGS}
     ;;
