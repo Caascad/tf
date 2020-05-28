@@ -206,7 +206,9 @@ function _tf_parsing () {
   ENV=$(basename "$(git remote get-url origin 2>/dev/null)")
   ENVIRONMENT="${ENVIRONMENT:-${ENV%.*}}"
   LIB_URL="${LIB_URL:-git@git.corp.cloudwatt.com:pocwatt/terraform/lib.git}"
-  if _is_git_url "${LIB_URL}"; then
+  if _is_local "${LIB_URL}"; then
+    GIT_REVISION="local"
+  else
     GIT_REVISION="${GIT_REVISION:-refs/heads/master}"
   fi
 
@@ -283,7 +285,6 @@ case "${ACTION}" in
     ;;
   *)
     _tf_init
-    # shellcheck disable=2086
     _tf_generic "${ACTION}" "${TF_ARGS[@]}"
     ;;
 esac
