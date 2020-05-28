@@ -8,16 +8,18 @@ TF_DEBUG="${TF_DEBUG:-0}"
 TF_ARGS=()
 
 log() {
+    [ ! -t 1 ] && return
     local args="$*"
     local prefix="\e[32m[tf]:\e[0m"
     echo -e "$prefix $args"
 }
 
 log_debug() {
+    [ ! -t 1 ] && return
     [[ ${TF_DEBUG} -eq 0 ]] && return
     local args="$*"
     local prefix="\e[36m[tf]:\e[0m"
-    echo -e "$prefix $args" >&2
+    echo -e "$prefix $args"
 }
 
 log_warning() {
