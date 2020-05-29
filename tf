@@ -260,15 +260,15 @@ function _tf_parsing () {
 
   ACTION=${TF_ARGS[0]}
   TF_ARGS=("${TF_ARGS[@]:1}")
+  TF_CONFIG_DIR="${TF_TMPDIR}/configurations/${CONFIGURATION}"
 
   log "Environment: ${ENVIRONMENT}"
   log "Lib: ${LIB_URL}"
   log "Revision: ${GIT_REVISION}"
+  log "Config: ${CONFIGURATION}"
+  log_debug "Config dir: ${TF_CONFIG_DIR}"
   log "Action: ${ACTION}"
   log "Args: ${TF_ARGS[*]}"
-  log "Config: ${CONFIGURATION}"
-  TF_CONFIG_DIR="${TF_TMPDIR}/configurations/${CONFIGURATION}"
-  log_debug "Config dir: ${TF_CONFIG_DIR}"
 
 }
 
