@@ -86,7 +86,7 @@ DESCRIPTION
 EXAMPLES
 
       $ tf apply -c base -r refs/head/master \\
-          -m git@git.corp.cloudwatt.com:pocwatt/terraform/mylib.git -e client1
+          -m git@git.corp.cloudwatt.com:caascad/terraform/mylib.git -e client1
 
       $ CONFIGURATION=base tf init
 EOF
@@ -207,7 +207,7 @@ function _tf_parsing () {
   # some default variables
   ENV=$(basename "$(git remote get-url origin 2>/dev/null)")
   ENVIRONMENT="${ENVIRONMENT:-${ENV%.*}}"
-  LIB_URL="${LIB_URL:-git@git.corp.cloudwatt.com:pocwatt/terraform/lib.git}"
+  LIB_URL="${LIB_URL:-git@git.corp.cloudwatt.com:caascad/terraform/lib.git}"
   if _is_local "${LIB_URL}"; then
     GIT_REVISION="local"
   else
