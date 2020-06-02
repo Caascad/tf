@@ -6,6 +6,7 @@ TF_TMPDIR="./.tmp"
 TF_CONFIG_DIR=""
 TF_DEBUG="${TF_DEBUG:-0}"
 TF_ARGS=()
+ENVIRONMENT=""
 
 log() {
     [ ! -t 1 ] && return
@@ -204,9 +205,6 @@ function _tf_parsing () {
   # trying to source our environments variables
   # shellcheck disable=1091
   source "tffile" &>/dev/null || true
-  # some default variables
-  ENV=$(basename "$(git remote get-url origin 2>/dev/null)")
-  ENVIRONMENT="${ENVIRONMENT:-${ENV%.*}}"
   LIB_URL="${LIB_URL:-git@git.corp.cloudwatt.com:caascad/terraform/lib.git}"
   if _is_local "${LIB_URL}"; then
     GIT_REVISION="local"
