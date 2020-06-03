@@ -104,27 +104,6 @@ function _tf_generic () {
 }
 
 function _tf_bootstrap () {
-  # global .envrc for s3 backend
-  if ! [[ -f "./.envrc" ]]; then
-    cat <<-'EOF' >"./.envrc"
-			# creds for AMAZON S3 backend
-			# Those creds are individuals and should be stored in you personal keystore
-			# you can use gopass to retrieve them. For example:
-			export AWS_ACCESS_KEY_ID=$(gopass keystore/caascad/aws/181151069204/AWS_ACCESS_KEY_ID)
-			export AWS_SECRET_ACCESS_KEY=$(gopass keystore/caascad/aws/181151069204/AWS_SECRET_ACCESS_KEY)
-		EOF
-  fi
-
-  # .gitignore
-  if ! [[ -f "./.gitignore" ]]; then
-    cat <<-'EOF' >"./.gitignore"
-			.terraform/
-			.envrc
-			.tmp/
-			.direnv.d/
-		EOF
-  fi
-
   # env directory
   mkdir -p "${CONFIGURATION}"
   (
