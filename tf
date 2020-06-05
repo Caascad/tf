@@ -154,7 +154,7 @@ function _tf_bootstrap () {
 			GIT_REVISION=${GIT_REVISION}
 			# TF_DEBUG=${TF_DEBUG}
 			# LIB_URL=${LIB_URL}
-			# LIB_URL=~/git/caascad/terraform
+			# LIB_URL=~/git/caascad/terraform/lib
 			ENVIRONMENT=${ENVIRONMENT}
 		EOF
   )
