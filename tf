@@ -104,27 +104,6 @@ function _tf_generic () {
 }
 
 function _tf_bootstrap () {
-  # global .envrc for s3 backend
-  if ! [[ -f "./.envrc" ]]; then
-    cat <<-'EOF' >"./.envrc"
-			# creds for AMAZON S3 backend
-			# Those creds are individuals and should be stored in you personal keystore
-			# you can use gopass to retrieve them. For example:
-			export AWS_ACCESS_KEY_ID=$(gopass keystore/caascad/aws/181151069204/AWS_ACCESS_KEY_ID)
-			export AWS_SECRET_ACCESS_KEY=$(gopass keystore/caascad/aws/181151069204/AWS_SECRET_ACCESS_KEY)
-		EOF
-  fi
-
-  # .gitignore
-  if ! [[ -f "./.gitignore" ]]; then
-    cat <<-'EOF' >"./.gitignore"
-			.terraform/
-			.envrc
-			.tmp/
-			.direnv.d/
-		EOF
-  fi
-
   # env directory
   mkdir -p "${CONFIGURATION}"
   (
@@ -133,30 +112,28 @@ function _tf_bootstrap () {
     # get the git repository
     _tf_fetch
 
-    # get envrc.EXAMPLE, tfvars file and documentation
-    LIST_FILE="$(find "${TF_CONFIG_DIR}" -name '*EXAMPLE' -o -name '*.tfvars*' -o -iname 'readme*' -o -name '*.md')"
-    for f in ${LIST_FILE}; do
+    # get *.tfvars if any
+    templates="$(find "${TF_CONFIG_DIR}" -name '*.tfvars*')"
+    for f in ${templates}; do
       if [[ ! -f $(basename "${f}") ]]; then
         cp "${f}" .
+        _tf_replace_env "$(basename "$f")"
       fi
     done
 
-    if [[ -f "${TF_CONFIG_DIR}/envrc.EXAMPLE" ]] && [[ ! -f ".envrc" ]]; then
-      cp "${TF_CONFIG_DIR}/envrc.EXAMPLE" .envrc || true
+    if [[ -f "envrc.EXAMPLE" ]] && [[ ! -f ".envrc" ]]; then
+      cp envrc.EXAMPLE .envrc
     fi
 
-    # substitute #ENVIRONMENT in terraform.tfvars and .envrc
-    sed -i "s/#ENVIRONMENT#/${ENVIRONMENT}/g" ./terraform.tfvars* "./.envrc" &>/dev/null || true
-
     # generate tffile
-    cat <<-EOF >"./tffile"
-			CONFIGURATION=${CONFIGURATION}
-			GIT_REVISION=${GIT_REVISION}
-			# TF_DEBUG=${TF_DEBUG}
-			# LIB_URL=${LIB_URL}
-			# LIB_URL=~/git/caascad/terraform/lib
-			ENVIRONMENT=${ENVIRONMENT}
-		EOF
+    cat <<EOF > "./tffile"
+CONFIGURATION=${CONFIGURATION}
+GIT_REVISION=${GIT_REVISION}
+# TF_DEBUG=${TF_DEBUG}
+# LIB_URL=${LIB_URL}
+# LIB_URL=~/git/caascad/terraform/lib
+ENVIRONMENT=${ENVIRONMENT}
+EOF
   )
 }
 
@@ -177,6 +154,21 @@ function _tf_fetch () {
     log_debug "Copying configuration from ${LIB_URL}"
     cp -R "${LIB_URL}"/* "${TF_TMPDIR}"
   fi
+  _tf_update_doc
+}
+
+function _tf_update_doc() {
+  # update *.EXAMPLE, *.md from configuration in the current directory
+  docs="$(find "${TF_CONFIG_DIR}" -name '*EXAMPLE' -o -name '*.md')"
+  for f in ${docs}; do
+    cp "${f}" .
+    _tf_replace_env "$(basename "$f")"
+  done
+}
+
+function _tf_replace_env() {
+  file="$1"
+  sed -i "s/#ENVIRONMENT#/${ENVIRONMENT}/g" "$file"
 }
 
 function _tf_init () {
