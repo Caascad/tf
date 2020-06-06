@@ -7,7 +7,7 @@ with pkgs;
 
 stdenv.mkDerivation rec {
   pname = "tf";
-  version = "1.6.1";
+  version = "1.6.2";
 
   unpackPhase = ":";
   installPhase = ''
