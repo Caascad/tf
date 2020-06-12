@@ -9,18 +9,16 @@ TF_ARGS=()
 ENVIRONMENT=""
 
 log() {
-    [ ! -t 1 ] && return
     local args="$*"
     local prefix="\e[32m[tf]:\e[0m"
-    echo -e "$prefix $args"
+    echo -e "$prefix $args" >&2
 }
 
 log_debug() {
-    [ ! -t 1 ] && return
     [[ ${TF_DEBUG} -eq 0 ]] && return
     local args="$*"
     local prefix="\e[36m[tf]:\e[0m"
-    echo -e "$prefix $args"
+    echo -e "$prefix $args" >&2
 }
 
 log_warning() {
@@ -145,10 +143,10 @@ function _tf_fetch () {
     # fetch lib.git repository
     (
       cd ${TF_TMPDIR}
-      git init
+      git init >&2
       git remote add origin "${LIB_URL}"
       git fetch origin "${GIT_REVISION}"
-      git reset --hard FETCH_HEAD
+      git reset --hard FETCH_HEAD >&2
     )
   else
     log_debug "Copying configuration from ${LIB_URL}"
@@ -182,7 +180,7 @@ function _tf_init () {
   sed -i "s/#ENVIRONMENT#/${ENVIRONMENT}/g" "${TF_CONFIG_DIR}"/*.tf*
 
   # terraform init
-  _tf_generic init -upgrade=true
+  _tf_generic init -upgrade=true >&2
 }
 
 function _tf_clean () {
@@ -271,7 +269,7 @@ case "${ACTION}" in
   init)
     _tf_init
     ;;
-  import|state|output)
+  import|state|output|show)
     [ ! -d "${TF_CONFIG_DIR}" ] && _tf_init
     _tf_generic "${ACTION}" "${TF_ARGS[@]}"
     ;;
