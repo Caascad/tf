@@ -74,7 +74,7 @@ DESCRIPTION
             Can be set to a local PATH for development purpose.
             e.g. ~/git/caascad/terraform/lib
 
-            default: git@git.corp.cloudwatt.com:pocwatt/terraform/lib.git
+            default: git@git.corp.cloudwatt.com:caascad/terraform/lib.git
 
       -e | --environment ENVIRONMENT
             The environment (i.e DNS domain) we are targetting
@@ -128,7 +128,7 @@ function _tf_bootstrap () {
 CONFIGURATION=${CONFIGURATION}
 GIT_REVISION=${GIT_REVISION}
 # TF_DEBUG=${TF_DEBUG}
-# LIB_URL=${LIB_URL}
+LIB_URL=${LIB_URL}
 # LIB_URL=~/git/caascad/terraform/lib
 ENVIRONMENT=${ENVIRONMENT}
 EOF
