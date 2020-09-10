@@ -180,7 +180,16 @@ function _tf_init () {
   sed -i "s/#ENVIRONMENT#/${ENVIRONMENT}/g" "${TF_CONFIG_DIR}"/*.tf*
 
   # terraform init
-  _tf_generic init -upgrade=true >&2
+  # detect args that should be passed to init as well
+  declare -a init_args
+  for arg in "$@"; do
+    case "$arg" in
+        -no-color|-input*)
+            init_args+=("$arg")
+            ;;
+    esac
+  done
+  _tf_generic init -upgrade=true "${init_args[@]}" >&2
 }
 
 function _tf_clean () {
@@ -267,14 +276,14 @@ case "${ACTION}" in
     "_tf_${ACTION}"
     ;;
   init)
-    _tf_init
+    _tf_init "${TF_ARGS[@]}"
     ;;
   import|state|output|show)
-    [ ! -d "${TF_CONFIG_DIR}" ] && _tf_init
+    [ ! -d "${TF_CONFIG_DIR}" ] && _tf_init "${TF_ARGS[@]}"
     _tf_generic "${ACTION}" "${TF_ARGS[@]}"
     ;;
   *)
-    _tf_init
+    _tf_init "${TF_ARGS[@]}"
     _tf_generic "${ACTION}" "${TF_ARGS[@]}"
     ;;
 esac
