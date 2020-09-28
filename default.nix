@@ -13,7 +13,7 @@ stdenv.mkDerivation rec {
   buildInputs = [ makeWrapper ];
   installPhase = ''
     install -m755 -D ${./tf} $out/bin/tf
-    wrapProgram $out/bin/tf --prefix PATH : "${lib.makeBinPath [ findutils gnused coreutils ]}"
+    wrapProgram $out/bin/tf --prefix PATH : "${lib.makeBinPath [ findutils gnused coreutils jq curl vault ]}"
   '';
 
   meta = with stdenv.lib; {
