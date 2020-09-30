@@ -223,7 +223,7 @@ function _tf_init () {
   fi
 
   # add any tf and tfvars files present here to override the downloaded configuration
-  cp ./*.{tf,tfvars,tfvars.json} "${TF_CONFIG_DIR}" &>/dev/null || true
+  cp ./*.{tfvars,tfvars.json} "${TF_CONFIG_DIR}" &>/dev/null || true
 
   # environment replacement in every *tf* files
   sed -i "s/#ENVIRONMENT#/${ENVIRONMENT}/g" "${TF_CONFIG_DIR}"/*.tf*
