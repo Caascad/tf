@@ -7,7 +7,7 @@ with pkgs;
 
 stdenv.mkDerivation rec {
   pname = "tf";
-  version = "1.6.4";
+  version = "1.6.5";
 
   unpackPhase = ":";
   buildInputs = [ makeWrapper ];
